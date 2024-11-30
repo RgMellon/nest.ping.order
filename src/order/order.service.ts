@@ -13,7 +13,7 @@ export class OrderService {
     this.logger.debug(`Creating order: ${JSON.stringify(order)}`);
 
     try {
-      this.orderRepository.createOrder(order);
+      return this.orderRepository.createOrder(order);
     } catch (err) {
       throw new RpcException(err);
     }
