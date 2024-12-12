@@ -4,6 +4,7 @@ import { CreateOrderDTO } from './dtos/create-order.dto';
 
 import { OrderService } from './order.service';
 import { ClientProxyPingMe } from 'src/proxyrmq/client-proxy';
+import { calculateDistance } from './utils/calculate-distance';
 
 @Controller('order')
 export class OrderController {
@@ -38,22 +39,25 @@ export class OrderController {
       this.logger.debug(`nearbySellers: ${JSON.stringify(nearbySellers)}`);
 
       const resultWithoutRequestedUser = nearbySellers.filter((item) => {
-        const distanceThreshold = 0.0001; // adjust based on your needs
-        return (
-          Math.abs(item.latitude - body.location.latitude) >
-            distanceThreshold ||
-          Math.abs(item.longitude - body.location.longitude) > distanceThreshold
+        const distanceInMeters = calculateDistance(
+          body.location.latitude,
+          body.location.longitude,
+          item.latitude,
+          item.longitude,
         );
+        return distanceInMeters > 1;
       });
 
-      console.log(resultWithoutRequestedUser, 'resultWithoutRequestedUser');
+      this.logger.debug(
+        `resultWithoutRequestedUser: ${resultWithoutRequestedUser}`,
+      );
 
       const tokens = resultWithoutRequestedUser.map((seller) => seller.key);
 
       const messages = tokens.map((token) => ({
         to: token,
         title: 'Nova solicitação',
-        body: `Quero ${body.description} por ${body.description}`,
+        body: `Quero ${body.description} por ${body.amount}`,
         data: {
           description: body.description,
           price: body.amount,
@@ -73,8 +77,6 @@ export class OrderController {
         .then((response) => response.json())
         .then((data) => console.log('Success:', data))
         .catch((error) => console.error('Error:', error));
-
-      console.log('Notificando vendedores próximos:', tokens);
 
       await channel.ack(originalMessage);
     } catch (err) {
